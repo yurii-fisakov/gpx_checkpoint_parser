@@ -8,7 +8,8 @@ distance of each checkpoint.
 - Python 3.9 or newer
 - GPX files containing timestamped track points, such as Strava exports
 
-No third-party packages are required.
+The command-line application has no third-party dependencies. The local web
+application uses Flask.
 
 ## Configure
 
@@ -51,3 +52,22 @@ The script creates `report.csv`:
 The user name is the GPX filename without `.gpx`. An empty checkpoint cell
 means the track never came within `radius_m` of that checkpoint. If a track
 enters the checkpoint radius more than once, only its first visit is reported.
+
+## Local web application
+
+Install Flask:
+
+```bash
+python3 -m pip install -r requirements.txt
+```
+
+Start the local server:
+
+```bash
+python3 web_app.py
+```
+
+Open [http://127.0.0.1:5000](http://127.0.0.1:5000). The page loads the
+checkpoint defaults from `checkpoints.json` and uses your browser timezone.
+Edit, add, or delete checkpoints; select one or more GPX files; then generate
+the report. The displayed report can be downloaded as `report.csv`.

@@ -286,6 +286,13 @@ class WebAppTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 400)
                 self.assertIn(expected_error, response.get_json()["error"])
 
+    def test_readme_documents_web_application_startup(self) -> None:
+        readme = (Path(__file__).parent / "README.md").read_text(encoding="utf-8")
+
+        self.assertIn("python3 -m pip install -r requirements.txt", readme)
+        self.assertIn("python3 web_app.py", readme)
+        self.assertIn("http://127.0.0.1:5000", readme)
+
     @staticmethod
     def _configuration() -> dict:
         return {
