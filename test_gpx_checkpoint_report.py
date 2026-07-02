@@ -1,7 +1,9 @@
 import csv
+import io
 import json
 import tempfile
 import unittest
+from contextlib import redirect_stderr
 from pathlib import Path
 from typing import Optional
 from zoneinfo import ZoneInfo
@@ -75,18 +77,102 @@ class GpxCheckpointTests(unittest.TestCase):
 
         self.assertEqual(result, {})
 
-    def test_rejects_reached_track_point_without_time(self) -> None:
+    def test_warns_and_uses_later_timestamp(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             gpx_path = Path(directory) / "rider.gpx"
-            write_gpx(gpx_path, [(47.0, 28.0, None)])
+            write_gpx(
+                gpx_path,
+                [
+                    (47.0, 28.0, None),
+                    (47.0, 28.0, "2026-07-01T01:00:00Z"),
+                ],
+            )
+            warnings = io.StringIO()
 
-            with self.assertRaisesRegex(ValueError, "missing a timestamp"):
-                find_checkpoint_times(
+            with redirect_stderr(warnings):
+                result = find_checkpoint_times(
                     gpx_path,
                     (Checkpoint("start", 47.0, 28.0),),
                     20.0,
                     ZoneInfo("UTC"),
                 )
+
+        self.assertEqual(result, {"start": "01:00:00"})
+        self.assertIn(
+            "warning: "
+            f"{gpx_path}: track point #1 reached checkpoint 'start' "
+            "but is missing a timestamp",
+            warnings.getvalue(),
+        )
+
+    def test_missing_timestamp_warns_with_ordered_checkpoint_names(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            gpx_path = Path(directory) / "rider.gpx"
+            write_gpx(gpx_path, [(47.0, 28.0, None)])
+            warnings = io.StringIO()
+
+            with redirect_stderr(warnings):
+                result = find_checkpoint_times(
+                    gpx_path,
+                    (
+                        Checkpoint("first", 47.0, 28.0),
+                        Checkpoint("second", 47.0, 28.0),
+                    ),
+                    20.0,
+                    ZoneInfo("UTC"),
+                )
+
+        self.assertEqual(result, {})
+        self.assertIn(
+            "track point #1 reached checkpoints 'first', 'second' "
+            "but is missing a timestamp",
+            warnings.getvalue(),
+        )
+
+    def test_report_continues_after_missing_timestamp(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            runtime_directory = Path(directory)
+            (runtime_directory / "checkpoints.json").write_text(
+                json.dumps(
+                    {
+                        "timezone": "UTC",
+                        "radius_m": 20,
+                        "checkpoints": [
+                            {
+                                "name": "start",
+                                "latitude": 47.0,
+                                "longitude": 28.0,
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            write_gpx(
+                runtime_directory / "a_missing.gpx",
+                [(47.0, 28.0, None)],
+            )
+            write_gpx(
+                runtime_directory / "b_valid.gpx",
+                [(47.0, 28.0, "2026-07-01T01:00:00Z")],
+            )
+            warnings = io.StringIO()
+
+            with redirect_stderr(warnings):
+                report_path = generate_report(runtime_directory)
+
+            with report_path.open(newline="", encoding="utf-8") as report:
+                rows = list(csv.reader(report))
+
+        self.assertEqual(
+            rows,
+            [
+                ["user_name", "start"],
+                ["a_missing", ""],
+                ["b_valid", "01:00:00"],
+            ],
+        )
+        self.assertIn("a_missing.gpx: track point #1", warnings.getvalue())
 
     def test_generates_dynamic_columns_sorted_by_gpx_filename(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

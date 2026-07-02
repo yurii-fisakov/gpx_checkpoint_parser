@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from __future__ import annotations
 
 import csv
@@ -126,12 +128,14 @@ def find_checkpoint_times(
 ) -> dict[str, str]:
     found: dict[str, str] = {}
     pending = {checkpoint.name: checkpoint for checkpoint in checkpoints}
+    track_point_number = 0
 
     try:
         elements = ElementTree.iterparse(gpx_path, events=("end",))
         for _, element in elements:
             if _local_name(element.tag) != "trkpt":
                 continue
+            track_point_number += 1
 
             try:
                 latitude = float(element.attrib["lat"])
@@ -164,9 +168,21 @@ def find_checkpoint_times(
                     None,
                 )
                 if time_element is None:
-                    raise ValueError(
-                        f"{gpx_path}: reached track point is missing a timestamp"
+                    checkpoint_label = (
+                        "checkpoint" if len(reached) == 1 else "checkpoints"
                     )
+                    checkpoint_names = ", ".join(
+                        repr(checkpoint.name) for checkpoint in reached
+                    )
+                    print(
+                        f"warning: {gpx_path}: track point "
+                        f"#{track_point_number} reached "
+                        f"{checkpoint_label} {checkpoint_names} "
+                        "but is missing a timestamp",
+                        file=sys.stderr,
+                    )
+                    element.clear()
+                    continue
                 local_time = _parse_time(time_element.text, gpx_path).astimezone(
                     timezone
                 )
