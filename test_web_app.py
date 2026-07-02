@@ -44,6 +44,16 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'"name": "default"', response.data)
         self.assertIn(b'"radius_m": 20.0', response.data)
+        for expected_control in (
+            b'id="timezone"',
+            b'id="radius"',
+            b'id="checkpoint-rows"',
+            b'id="add-checkpoint"',
+            b'id="gpx-files"',
+            b'id="generate-report"',
+            b'id="download-csv"',
+        ):
+            self.assertIn(expected_control, response.data)
 
     def test_generates_report_for_uploaded_files_and_browser_timezone(self) -> None:
         configuration = {

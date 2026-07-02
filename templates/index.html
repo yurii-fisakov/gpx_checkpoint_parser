@@ -2,11 +2,351 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>GPX checkpoint report</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: system-ui, sans-serif;
+      color: #172033;
+      background: #f4f6fa;
+    }
+
+    body {
+      margin: 0;
+    }
+
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 32px 20px 64px;
+    }
+
+    h1 {
+      margin-top: 0;
+    }
+
+    section {
+      margin-top: 24px;
+      padding: 24px;
+      border: 1px solid #d8deea;
+      border-radius: 12px;
+      background: white;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      font-weight: 600;
+    }
+
+    input,
+    button {
+      font: inherit;
+    }
+
+    input {
+      min-width: 0;
+      padding: 9px 10px;
+      border: 1px solid #aeb8ca;
+      border-radius: 6px;
+    }
+
+    button {
+      padding: 10px 14px;
+      border: 0;
+      border-radius: 6px;
+      background: #2457d6;
+      color: white;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      background: #526176;
+    }
+
+    button.danger {
+      background: #b42318;
+    }
+
+    button:disabled {
+      cursor: wait;
+      opacity: .6;
+    }
+
+    .settings {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 16px;
+    }
+
+    .checkpoint-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr auto;
+      gap: 10px;
+      align-items: end;
+      margin-bottom: 10px;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .message {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 6px;
+    }
+
+    .error {
+      color: #7a271a;
+      background: #fef3f2;
+    }
+
+    .warning {
+      color: #7a2e0e;
+      background: #fffaeb;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      padding: 10px;
+      border: 1px solid #d8deea;
+      text-align: left;
+    }
+
+    th {
+      background: #eef2f8;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    @media (max-width: 720px) {
+      .settings,
+      .checkpoint-row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </head>
 <body>
+  <main>
+    <h1>GPX checkpoint report</h1>
+    <p>Configure checkpoints, upload GPX tracks, and generate arrival times.</p>
+
+    <form id="report-form">
+      <section>
+        <h2>Configuration</h2>
+        <div class="settings">
+          <label>
+            Browser timezone
+            <input id="timezone" readonly required>
+          </label>
+          <label>
+            Checkpoint radius (metres)
+            <input id="radius" type="number" min="0.01" step="any" required>
+          </label>
+        </div>
+
+        <h3>Checkpoints</h3>
+        <div id="checkpoint-rows"></div>
+        <button id="add-checkpoint" class="secondary" type="button">
+          Add new checkpoint
+        </button>
+      </section>
+
+      <section>
+        <h2>GPX files</h2>
+        <label>
+          Select one or more tracks
+          <input id="gpx-files" type="file" accept=".gpx" multiple required>
+        </label>
+        <div class="actions">
+          <button id="generate-report" type="submit">Generate report</button>
+        </div>
+        <div id="error" class="message error" role="alert" hidden></div>
+      </section>
+    </form>
+
+    <section id="report-section" hidden>
+      <h2>Report</h2>
+      <div class="table-wrap">
+        <table id="report-table"></table>
+      </div>
+      <div id="warnings" class="message warning" hidden></div>
+      <div class="actions">
+        <button id="download-csv" type="button">Download CSV</button>
+      </div>
+    </section>
+  </main>
+
   <script>
     const defaults = {{ defaults | tojson }};
+    const rowsContainer = document.querySelector("#checkpoint-rows");
+    const form = document.querySelector("#report-form");
+    const errorBox = document.querySelector("#error");
+    const reportSection = document.querySelector("#report-section");
+    const reportTable = document.querySelector("#report-table");
+    const warningsBox = document.querySelector("#warnings");
+    const submitButton = document.querySelector("#generate-report");
+    let reportData = null;
+
+    document.querySelector("#timezone").value =
+      Intl.DateTimeFormat().resolvedOptions().timeZone;
+    document.querySelector("#radius").value = defaults.radius_m;
+
+    function addCheckpoint(checkpoint = {}) {
+      const row = document.createElement("div");
+      row.className = "checkpoint-row";
+      row.innerHTML = `
+        <label>
+          Name
+          <input class="checkpoint-name" required>
+        </label>
+        <label>
+          Latitude
+          <input class="checkpoint-latitude" type="number"
+            min="-90" max="90" step="any" required>
+        </label>
+        <label>
+          Longitude
+          <input class="checkpoint-longitude" type="number"
+            min="-180" max="180" step="any" required>
+        </label>
+        <button class="danger delete-checkpoint" type="button">Delete</button>
+      `;
+      row.querySelector(".checkpoint-name").value = checkpoint.name ?? "";
+      row.querySelector(".checkpoint-latitude").value =
+        checkpoint.latitude ?? "";
+      row.querySelector(".checkpoint-longitude").value =
+        checkpoint.longitude ?? "";
+      row.querySelector(".delete-checkpoint").addEventListener(
+        "click",
+        () => row.remove(),
+      );
+      rowsContainer.append(row);
+    }
+
+    defaults.checkpoints.forEach(addCheckpoint);
+    document.querySelector("#add-checkpoint").addEventListener(
+      "click",
+      () => addCheckpoint(),
+    );
+
+    function currentConfiguration() {
+      return {
+        timezone: document.querySelector("#timezone").value,
+        radius_m: Number(document.querySelector("#radius").value),
+        checkpoints: [...document.querySelectorAll(".checkpoint-row")].map(
+          (row) => ({
+            name: row.querySelector(".checkpoint-name").value,
+            latitude: Number(row.querySelector(".checkpoint-latitude").value),
+            longitude: Number(row.querySelector(".checkpoint-longitude").value),
+          }),
+        ),
+      };
+    }
+
+    function renderReport(data) {
+      reportTable.replaceChildren();
+      const header = reportTable.createTHead().insertRow();
+      data.columns.forEach((column) => {
+        const cell = document.createElement("th");
+        cell.scope = "col";
+        cell.textContent = column;
+        header.append(cell);
+      });
+      const body = reportTable.createTBody();
+      data.rows.forEach((values) => {
+        const row = body.insertRow();
+        values.forEach((value) => {
+          const cell = row.insertCell();
+          cell.textContent = value;
+        });
+      });
+
+      warningsBox.replaceChildren();
+      if (data.warnings.length) {
+        const list = document.createElement("ul");
+        data.warnings.forEach((warning) => {
+          const item = document.createElement("li");
+          item.textContent = warning;
+          list.append(item);
+        });
+        warningsBox.append(list);
+        warningsBox.hidden = false;
+      } else {
+        warningsBox.hidden = true;
+      }
+      reportSection.hidden = false;
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      errorBox.hidden = true;
+      if (!rowsContainer.children.length) {
+        errorBox.textContent = "Add at least one checkpoint.";
+        errorBox.hidden = false;
+        return;
+      }
+
+      const body = new FormData();
+      body.append("configuration", JSON.stringify(currentConfiguration()));
+      [...document.querySelector("#gpx-files").files].forEach(
+        (file) => body.append("gpx_files", file),
+      );
+
+      submitButton.disabled = true;
+      try {
+        const response = await fetch("/api/report", { method: "POST", body });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "Unable to generate report.");
+        }
+        reportData = data;
+        renderReport(data);
+      } catch (error) {
+        errorBox.textContent = error.message;
+        errorBox.hidden = false;
+      } finally {
+        submitButton.disabled = false;
+      }
+    });
+
+    function csvCell(value) {
+      return `"${String(value).replaceAll('"', '""')}"`;
+    }
+
+    document.querySelector("#download-csv").addEventListener("click", () => {
+      if (!reportData) {
+        return;
+      }
+      const csv = [reportData.columns, ...reportData.rows]
+        .map((row) => row.map(csvCell).join(","))
+        .join("\r\n");
+      const url = URL.createObjectURL(
+        new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }),
+      );
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "report.csv";
+      link.click();
+      URL.revokeObjectURL(url);
+    });
   </script>
 </body>
 </html>
