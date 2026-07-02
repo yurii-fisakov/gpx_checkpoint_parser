@@ -53,7 +53,34 @@ The user name is the GPX filename without `.gpx`. An empty checkpoint cell
 means the track never came within `radius_m` of that checkpoint. If a track
 enters the checkpoint radius more than once, only its first visit is reported.
 
-## Local web application
+## Docker web application
+
+Start the service with Docker Compose:
+
+```bash
+docker compose up --build
+```
+
+Open [http://127.0.0.1:5000](http://127.0.0.1:5000). Compose mounts the local
+`checkpoints.json` read-only, so changes to the default checkpoints do not
+require rebuilding the image. Stop the service with `docker compose down`.
+
+To run without Compose:
+
+```bash
+docker build -t gpx-checkpoint-report .
+docker run --rm \
+  -p 127.0.0.1:5000:8000 \
+  --read-only \
+  --tmpfs /tmp \
+  -v "$PWD/checkpoints.json:/app/checkpoints.json:ro" \
+  gpx-checkpoint-report
+```
+
+The container stores uploaded GPX files only in temporary memory and does not
+persist reports.
+
+## Native web application
 
 Install Flask:
 
