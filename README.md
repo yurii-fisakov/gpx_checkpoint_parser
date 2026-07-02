@@ -8,7 +8,8 @@ distance of each checkpoint.
 - Python 3.9 or newer
 - GPX files containing timestamped track points, such as Strava exports
 
-No third-party packages are required.
+The command-line application has no third-party dependencies. The local web
+application uses Flask.
 
 ## Configure
 
@@ -51,3 +52,49 @@ The script creates `report.csv`:
 The user name is the GPX filename without `.gpx`. An empty checkpoint cell
 means the track never came within `radius_m` of that checkpoint. If a track
 enters the checkpoint radius more than once, only its first visit is reported.
+
+## Docker web application
+
+Start the service with Docker Compose:
+
+```bash
+docker compose up --build
+```
+
+Open [http://127.0.0.1:5000](http://127.0.0.1:5000). Compose mounts the local
+`checkpoints.json` read-only, so changes to the default checkpoints do not
+require rebuilding the image. Stop the service with `docker compose down`.
+
+To run without Compose:
+
+```bash
+docker build -t gpx-checkpoint-report .
+docker run --rm \
+  -p 127.0.0.1:5000:8000 \
+  --read-only \
+  --tmpfs /tmp \
+  -v "$PWD/checkpoints.json:/app/checkpoints.json:ro" \
+  gpx-checkpoint-report
+```
+
+The container stores uploaded GPX files only in temporary memory and does not
+persist reports.
+
+## Native web application
+
+Install Flask:
+
+```bash
+python3 -m pip install -r requirements.txt
+```
+
+Start the local server:
+
+```bash
+python3 web_app.py
+```
+
+Open [http://127.0.0.1:5000](http://127.0.0.1:5000). The page loads the
+checkpoint defaults from `checkpoints.json` and uses your browser timezone.
+Edit, add, or delete checkpoints; select one or more GPX files; then generate
+the report. The displayed report can be downloaded as `report.csv`.

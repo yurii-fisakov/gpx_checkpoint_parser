@@ -10,10 +10,13 @@ from zoneinfo import ZoneInfo
 
 from gpx_checkpoint_report import (
     Checkpoint,
+    Config,
+    build_report_rows,
     find_checkpoint_times,
     generate_report,
     haversine_m,
     load_config,
+    parse_config,
 )
 
 
@@ -36,6 +39,58 @@ def write_gpx(
 
 
 class GpxCheckpointTests(unittest.TestCase):
+    def test_parses_in_memory_configuration(self) -> None:
+        config = parse_config(
+            {
+                "timezone": "Europe/Chisinau",
+                "radius_m": 25,
+                "checkpoints": [
+                    {"name": "start", "latitude": 47.0, "longitude": 28.0}
+                ],
+            }
+        )
+
+        self.assertEqual(config.timezone, ZoneInfo("Europe/Chisinau"))
+        self.assertEqual(config.radius_m, 25.0)
+        self.assertEqual(
+            config.checkpoints,
+            (Checkpoint("start", 47.0, 28.0),),
+        )
+
+    def test_builds_rows_from_explicit_paths_and_configuration(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            runtime_directory = Path(directory)
+            write_gpx(
+                runtime_directory / "zoe.gpx",
+                [(47.0, 28.0, "2026-07-01T01:00:00Z")],
+            )
+            write_gpx(
+                runtime_directory / "amy.gpx",
+                [(48.0, 29.0, "2026-07-01T02:00:00Z")],
+            )
+            config = Config(
+                ZoneInfo("Europe/Chisinau"),
+                20.0,
+                (Checkpoint("start", 47.0, 28.0),),
+            )
+
+            rows = build_report_rows(
+                [
+                    runtime_directory / "zoe.gpx",
+                    runtime_directory / "amy.gpx",
+                ],
+                config,
+            )
+
+        self.assertEqual(
+            rows,
+            [
+                ["user_name", "start"],
+                ["amy", ""],
+                ["zoe", "04:00:00"],
+            ],
+        )
+
     def test_haversine_calculates_short_distance_in_metres(self) -> None:
         distance = haversine_m(0.0, 0.0, 0.0, 0.000179864)
 

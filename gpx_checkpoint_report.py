@@ -44,35 +44,39 @@ def load_config(path: Path) -> Config:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         raise ValueError(f"{path}: unable to read valid JSON configuration") from error
+    return parse_config(data, str(path))
+
+
+def parse_config(data: Any, source: str = "configuration") -> Config:
     if not isinstance(data, dict):
-        raise ValueError(f"{path}: configuration must be a JSON object")
+        raise ValueError(f"{source}: configuration must be a JSON object")
 
     timezone_name = data.get("timezone")
     if not isinstance(timezone_name, str) or not timezone_name:
-        raise ValueError(f"{path}: timezone must be a non-empty string")
+        raise ValueError(f"{source}: timezone must be a non-empty string")
     try:
         timezone = ZoneInfo(timezone_name)
     except ZoneInfoNotFoundError as error:
-        raise ValueError(f"{path}: unknown timezone {timezone_name!r}") from error
+        raise ValueError(f"{source}: unknown timezone {timezone_name!r}") from error
 
     radius_m = _number(data.get("radius_m"), "radius_m")
     if radius_m <= 0:
-        raise ValueError(f"{path}: radius_m must be greater than zero")
+        raise ValueError("radius_m must be greater than zero")
 
     raw_checkpoints = data.get("checkpoints")
     if not isinstance(raw_checkpoints, list) or not raw_checkpoints:
-        raise ValueError(f"{path}: checkpoints must be a non-empty list")
+        raise ValueError(f"{source}: checkpoints must be a non-empty list")
 
     checkpoints: list[Checkpoint] = []
     names: set[str] = set()
     for index, raw_checkpoint in enumerate(raw_checkpoints):
         if not isinstance(raw_checkpoint, dict):
-            raise ValueError(f"{path}: checkpoint {index} must be an object")
+            raise ValueError(f"{source}: checkpoint {index} must be an object")
         name = raw_checkpoint.get("name")
         if not isinstance(name, str) or not name:
-            raise ValueError(f"{path}: checkpoint {index} name must be non-empty")
+            raise ValueError(f"{source}: checkpoint {index} name must be non-empty")
         if name in names:
-            raise ValueError(f"{path}: checkpoint names must be unique")
+            raise ValueError(f"{source}: checkpoint names must be unique")
         latitude = _number(
             raw_checkpoint.get("latitude"), f"checkpoint {name} latitude"
         )
@@ -80,7 +84,9 @@ def load_config(path: Path) -> Config:
             raw_checkpoint.get("longitude"), f"checkpoint {name} longitude"
         )
         if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
-            raise ValueError(f"{path}: checkpoint {name} coordinates are out of range")
+            raise ValueError(
+                f"{source}: checkpoint {name} coordinates are out of range"
+            )
         checkpoints.append(Checkpoint(name, latitude, longitude))
         names.add(name)
 
@@ -198,6 +204,32 @@ def find_checkpoint_times(
     return found
 
 
+def build_report_rows(
+    gpx_paths: list[Path],
+    config: Config,
+) -> list[list[str]]:
+    rows = [
+        ["user_name", *(checkpoint.name for checkpoint in config.checkpoints)]
+    ]
+    for gpx_path in sorted(gpx_paths, key=lambda path: path.name):
+        times = find_checkpoint_times(
+            gpx_path,
+            config.checkpoints,
+            config.radius_m,
+            config.timezone,
+        )
+        rows.append(
+            [
+                gpx_path.stem,
+                *(
+                    times.get(checkpoint.name, "")
+                    for checkpoint in config.checkpoints
+                ),
+            ]
+        )
+    return rows
+
+
 def generate_report(
     directory: Path,
     config_name: str = "checkpoints.json",
@@ -205,30 +237,11 @@ def generate_report(
 ) -> Path:
     config = load_config(directory / config_name)
     output_path = directory / output_name
-    gpx_paths = sorted(directory.glob("*.gpx"), key=lambda path: path.name)
+    rows = build_report_rows(list(directory.glob("*.gpx")), config)
 
     try:
         with output_path.open("w", newline="", encoding="utf-8") as report:
-            writer = csv.writer(report)
-            writer.writerow(
-                ["user_name", *(checkpoint.name for checkpoint in config.checkpoints)]
-            )
-            for gpx_path in gpx_paths:
-                times = find_checkpoint_times(
-                    gpx_path,
-                    config.checkpoints,
-                    config.radius_m,
-                    config.timezone,
-                )
-                writer.writerow(
-                    [
-                        gpx_path.stem,
-                        *(
-                            times.get(checkpoint.name, "")
-                            for checkpoint in config.checkpoints
-                        ),
-                    ]
-                )
+            csv.writer(report).writerows(rows)
     except OSError as error:
         raise ValueError(f"{output_path}: unable to write report") from error
 
