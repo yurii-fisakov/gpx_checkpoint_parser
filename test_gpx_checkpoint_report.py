@@ -1,10 +1,18 @@
+import csv
+import json
 import tempfile
 import unittest
 from pathlib import Path
 from typing import Optional
 from zoneinfo import ZoneInfo
 
-from gpx_checkpoint_report import Checkpoint, find_checkpoint_times, haversine_m
+from gpx_checkpoint_report import (
+    Checkpoint,
+    find_checkpoint_times,
+    generate_report,
+    haversine_m,
+    load_config,
+)
 
 
 def write_gpx(
@@ -79,6 +87,73 @@ class GpxCheckpointTests(unittest.TestCase):
                     20.0,
                     ZoneInfo("UTC"),
                 )
+
+    def test_generates_dynamic_columns_sorted_by_gpx_filename(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            runtime_directory = Path(directory)
+            (runtime_directory / "checkpoints.json").write_text(
+                json.dumps(
+                    {
+                        "timezone": "Europe/Chisinau",
+                        "radius_m": 20,
+                        "checkpoints": [
+                            {
+                                "name": "finish",
+                                "latitude": 47.1,
+                                "longitude": 28.1,
+                            },
+                            {
+                                "name": "start",
+                                "latitude": 47.0,
+                                "longitude": 28.0,
+                            },
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            write_gpx(
+                runtime_directory / "zoe.gpx",
+                [(47.0, 28.0, "2026-07-01T01:00:00Z")],
+            )
+            write_gpx(
+                runtime_directory / "amy.gpx",
+                [(47.1, 28.1, "2026-07-01T02:00:00Z")],
+            )
+
+            report_path = generate_report(runtime_directory)
+
+            with report_path.open(newline="", encoding="utf-8") as report:
+                rows = list(csv.reader(report))
+
+        self.assertEqual(
+            rows,
+            [
+                ["user_name", "finish", "start"],
+                ["amy", "05:00:00", ""],
+                ["zoe", "", "04:00:00"],
+            ],
+        )
+
+    def test_rejects_duplicate_checkpoint_names(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            config_path = Path(directory) / "checkpoints.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "timezone": "UTC",
+                        "radius_m": 20,
+                        "checkpoints": [
+                            {"name": "same", "latitude": 47.0, "longitude": 28.0},
+                            {"name": "same", "latitude": 48.0, "longitude": 29.0},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ValueError, "unique"):
+                load_config(config_path)
 
 
 if __name__ == "__main__":

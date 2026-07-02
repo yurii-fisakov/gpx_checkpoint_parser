@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import csv
+import json
 import math
+import sys
 import xml.etree.ElementTree as ElementTree
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from zoneinfo import ZoneInfo
+from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 EARTH_RADIUS_M = 6_371_000.0
 
@@ -15,6 +19,70 @@ class Checkpoint:
     name: str
     latitude: float
     longitude: float
+
+
+@dataclass(frozen=True)
+class Config:
+    timezone: ZoneInfo
+    radius_m: float
+    checkpoints: tuple[Checkpoint, ...]
+
+
+def _number(value: Any, field: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{field} must be a number")
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError(f"{field} must be finite")
+    return number
+
+
+def load_config(path: Path) -> Config:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(f"{path}: unable to read valid JSON configuration") from error
+    if not isinstance(data, dict):
+        raise ValueError(f"{path}: configuration must be a JSON object")
+
+    timezone_name = data.get("timezone")
+    if not isinstance(timezone_name, str) or not timezone_name:
+        raise ValueError(f"{path}: timezone must be a non-empty string")
+    try:
+        timezone = ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError as error:
+        raise ValueError(f"{path}: unknown timezone {timezone_name!r}") from error
+
+    radius_m = _number(data.get("radius_m"), "radius_m")
+    if radius_m <= 0:
+        raise ValueError(f"{path}: radius_m must be greater than zero")
+
+    raw_checkpoints = data.get("checkpoints")
+    if not isinstance(raw_checkpoints, list) or not raw_checkpoints:
+        raise ValueError(f"{path}: checkpoints must be a non-empty list")
+
+    checkpoints: list[Checkpoint] = []
+    names: set[str] = set()
+    for index, raw_checkpoint in enumerate(raw_checkpoints):
+        if not isinstance(raw_checkpoint, dict):
+            raise ValueError(f"{path}: checkpoint {index} must be an object")
+        name = raw_checkpoint.get("name")
+        if not isinstance(name, str) or not name:
+            raise ValueError(f"{path}: checkpoint {index} name must be non-empty")
+        if name in names:
+            raise ValueError(f"{path}: checkpoint names must be unique")
+        latitude = _number(
+            raw_checkpoint.get("latitude"), f"checkpoint {name} latitude"
+        )
+        longitude = _number(
+            raw_checkpoint.get("longitude"), f"checkpoint {name} longitude"
+        )
+        if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
+            raise ValueError(f"{path}: checkpoint {name} coordinates are out of range")
+        checkpoints.append(Checkpoint(name, latitude, longitude))
+        names.add(name)
+
+    return Config(timezone, radius_m, tuple(checkpoints))
 
 
 def haversine_m(
@@ -112,3 +180,53 @@ def find_checkpoint_times(
         raise ValueError(f"{gpx_path}: unable to read GPX file") from error
 
     return found
+
+
+def generate_report(
+    directory: Path,
+    config_name: str = "checkpoints.json",
+    output_name: str = "report.csv",
+) -> Path:
+    config = load_config(directory / config_name)
+    output_path = directory / output_name
+    gpx_paths = sorted(directory.glob("*.gpx"), key=lambda path: path.name)
+
+    try:
+        with output_path.open("w", newline="", encoding="utf-8") as report:
+            writer = csv.writer(report)
+            writer.writerow(
+                ["user_name", *(checkpoint.name for checkpoint in config.checkpoints)]
+            )
+            for gpx_path in gpx_paths:
+                times = find_checkpoint_times(
+                    gpx_path,
+                    config.checkpoints,
+                    config.radius_m,
+                    config.timezone,
+                )
+                writer.writerow(
+                    [
+                        gpx_path.stem,
+                        *(
+                            times.get(checkpoint.name, "")
+                            for checkpoint in config.checkpoints
+                        ),
+                    ]
+                )
+    except OSError as error:
+        raise ValueError(f"{output_path}: unable to write report") from error
+
+    return output_path
+
+
+def main() -> int:
+    try:
+        generate_report(Path.cwd())
+    except ValueError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

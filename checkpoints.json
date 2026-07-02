@@ -1,0 +1,11 @@
+{
+  "timezone": "Europe/Chisinau",
+  "radius_m": 20,
+  "checkpoints": [
+    {
+      "name": "checkpoint_1",
+      "latitude": 47.081821,
+      "longitude": 28.769529
+    }
+  ]
+}
