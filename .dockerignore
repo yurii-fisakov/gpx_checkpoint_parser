@@ -1,0 +1,10 @@
+.git
+.gitignore
+.DS_Store
+__pycache__/
+*.py[cod]
+.pytest_cache/
+docs/
+test_*.py
+*.gpx
+report.csv
