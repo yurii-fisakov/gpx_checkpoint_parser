@@ -43,8 +43,10 @@ python3 gpx_checkpoint_report.py
 The script creates `report.csv`:
 
 ```csv
-user_name,checkpoint_1
-Yurii_fisakov,04:14:09
+user_name,Ставчены,Грушевский родник,Поворот на ВлВ,Круг ВлВ
+Oleg Sat,05:29:15,05:46:03,06:07:42,06:15:33
+Игорь Артемов,07:06:41,07:25:29,07:57:11,08:09:36
+Юра Фисаков,05:29:06,05:45:19,06:07:42,06:15:14
 ```
 
 The user name is the GPX filename without `.gpx`. An empty checkpoint cell
