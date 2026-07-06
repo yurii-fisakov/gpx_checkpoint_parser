@@ -68,6 +68,12 @@ class WebAppTests(unittest.TestCase):
         self.assertIn('<html lang="ru">', response.text)
         self.assertIn("<details>", response.text)
         self.assertNotIn("<details open", response.text)
+        self.assertIn('class="info-icon"', response.text)
+        self.assertIn('tabindex="0"', response.text)
+        self.assertIn(
+            "Расстояние, в пределах которого точка считается пройденной.",
+            response.text,
+        )
 
     def test_generates_report_for_uploaded_files_and_browser_timezone(self) -> None:
         configuration = {
