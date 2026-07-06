@@ -54,6 +54,26 @@ class WebAppTests(unittest.TestCase):
             b'id="download-csv"',
         ):
             self.assertIn(expected_control, response.data)
+        for expected_text in (
+            "Отчёт по контрольным точкам GPX",
+            "Настройки",
+            "Часовой пояс браузера",
+            "Контрольные точки",
+            "Добавить контрольную точку",
+            "Файлы GPX",
+            "Сформировать отчёт",
+            "Скачать CSV",
+        ):
+            self.assertIn(expected_text, response.text)
+        self.assertIn('<html lang="ru">', response.text)
+        self.assertIn("<details>", response.text)
+        self.assertNotIn("<details open", response.text)
+        self.assertIn('class="info-icon"', response.text)
+        self.assertIn('tabindex="0"', response.text)
+        self.assertIn(
+            "Расстояние, в пределах которого точка считается пройденной.",
+            response.text,
+        )
 
     def test_generates_report_for_uploaded_files_and_browser_timezone(self) -> None:
         configuration = {

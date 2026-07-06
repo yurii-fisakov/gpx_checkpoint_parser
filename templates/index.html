@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="ru">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>GPX checkpoint report</title>
+  <title>Отчёт по контрольным точкам GPX</title>
   <style>
     :root {
       color-scheme: light;
@@ -40,6 +40,46 @@
       font-weight: 600;
     }
 
+    .label-text {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .info-icon {
+      position: relative;
+      color: #526176;
+      cursor: help;
+      font-size: .9em;
+      line-height: 1;
+      outline-offset: 2px;
+    }
+
+    .tooltip {
+      position: absolute;
+      z-index: 1;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      width: 220px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      background: #172033;
+      color: white;
+      font-size: .85rem;
+      font-weight: 400;
+      line-height: 1.3;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(-50%);
+      visibility: hidden;
+    }
+
+    .info-icon:hover .tooltip,
+    .info-icon:focus .tooltip {
+      opacity: 1;
+      visibility: visible;
+    }
+
     input,
     button {
       font: inherit;
@@ -72,6 +112,21 @@
     button:disabled {
       cursor: wait;
       opacity: .6;
+    }
+
+    summary {
+      width: fit-content;
+      margin-top: 16px;
+      padding: 10px 14px;
+      border-radius: 6px;
+      background: #526176;
+      color: white;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    details[open] summary {
+      margin-bottom: 16px;
     }
 
     .settings {
@@ -145,51 +200,66 @@
 </head>
 <body>
   <main>
-    <h1>GPX checkpoint report</h1>
-    <p>Configure checkpoints, upload GPX tracks, and generate arrival times.</p>
+    <h1>Отчёт по контрольным точкам GPX</h1>
+    <p>Загрузите GPX-треки и получите время прибытия.</p>
 
     <form id="report-form">
       <section>
-        <h2>Configuration</h2>
+        <h2>Настройки</h2>
         <div class="settings">
           <label>
-            Browser timezone
+            Часовой пояс браузера
             <input id="timezone" readonly required>
           </label>
           <label>
-            Checkpoint radius (metres)
+            <span class="label-text">
+              Радиус контрольной точки (м)
+              <span
+                class="info-icon"
+                role="img"
+                tabindex="0"
+                aria-label="Расстояние, в пределах которого точка считается пройденной."
+              >
+                ⓘ
+                <span class="tooltip" aria-hidden="true">
+                  Расстояние, в пределах которого точка считается пройденной.
+                </span>
+              </span>
+            </span>
             <input id="radius" type="number" min="0.01" step="any" required>
           </label>
         </div>
 
-        <h3>Checkpoints</h3>
-        <div id="checkpoint-rows"></div>
-        <button id="add-checkpoint" class="secondary" type="button">
-          Add new checkpoint
-        </button>
+        <details>
+          <summary>Контрольные точки</summary>
+          <div id="checkpoint-rows"></div>
+          <button id="add-checkpoint" class="secondary" type="button">
+            Добавить контрольную точку
+          </button>
+        </details>
       </section>
 
       <section>
-        <h2>GPX files</h2>
+        <h2>Файлы GPX</h2>
         <label>
-          Select one or more tracks
+          Выберите один или несколько треков
           <input id="gpx-files" type="file" accept=".gpx" multiple required>
         </label>
         <div class="actions">
-          <button id="generate-report" type="submit">Generate report</button>
+          <button id="generate-report" type="submit">Сформировать отчёт</button>
         </div>
         <div id="error" class="message error" role="alert" hidden></div>
       </section>
     </form>
 
     <section id="report-section" hidden>
-      <h2>Report</h2>
+      <h2>Отчёт</h2>
       <div class="table-wrap">
         <table id="report-table"></table>
       </div>
       <div id="warnings" class="message warning" hidden></div>
       <div class="actions">
-        <button id="download-csv" type="button">Download CSV</button>
+        <button id="download-csv" type="button">Скачать CSV</button>
       </div>
     </section>
   </main>
@@ -214,20 +284,20 @@
       row.className = "checkpoint-row";
       row.innerHTML = `
         <label>
-          Name
+          Название
           <input class="checkpoint-name" required>
         </label>
         <label>
-          Latitude
+          Широта
           <input class="checkpoint-latitude" type="number"
             min="-90" max="90" step="any" required>
         </label>
         <label>
-          Longitude
+          Долгота
           <input class="checkpoint-longitude" type="number"
             min="-180" max="180" step="any" required>
         </label>
-        <button class="danger delete-checkpoint" type="button">Delete</button>
+        <button class="danger delete-checkpoint" type="button">Удалить</button>
       `;
       row.querySelector(".checkpoint-name").value = checkpoint.name ?? "";
       row.querySelector(".checkpoint-latitude").value =

@@ -1,26 +1,38 @@
 {
   "timezone": "Europe/Chisinau",
-  "radius_m": 20,
+  "radius_m": 100,
   "checkpoints": [
     {
-      "name": "Ставчены",
-      "latitude": 47.09853943146771,
-      "longitude": 28.86357693279322
+      "name": "Старт, Giant Центр",
+      "latitude": 47.03057231155459,
+      "longitude": 28.823230964436682
     },
     {
-      "name": "Грушевский родник",
-      "latitude": 47.13570340503546,
-      "longitude": 28.936821353545643
+      "name": "Bomba, Калараш",
+      "latitude": 47.247585,
+      "longitude": 28.318913
     },
     {
-      "name": "Поворот на ВлВ",
-      "latitude": 47.11679103022673,
-      "longitude": 29.05626167055652
+      "name": "Венто, АЗС",
+      "latitude": 47.553632,
+      "longitude": 27.749044
     },
     {
-      "name": "Круг ВлВ",
-      "latitude": 47.08882670424578,
-      "longitude": 29.078139440030572
+      "name": "Лукойл, АЗС",
+      "latitude": 47.295358,
+      "longitude": 28.807601
+    },
+    {
+      "name": "Дубоссары, дамба",
+      "latitude": 47.275980,
+      "longitude": 29.117670
+    },
+    {
+      "name": "Финиш, Giant Рышкановка",
+      "latitude": 47.04927991451699,
+      "longitude": 28.862793217677353
     }
   ]
 }
+
+
