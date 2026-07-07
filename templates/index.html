@@ -129,6 +129,12 @@
       margin-bottom: 16px;
     }
 
+    .hidden-checkpoints {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid #d8deea;
+    }
+
     .settings {
       display: grid;
       grid-template-columns: 2fr 1fr;
@@ -141,6 +147,10 @@
       gap: 10px;
       align-items: end;
       margin-bottom: 10px;
+    }
+
+    .checkpoint-row[data-hidden="true"] {
+      opacity: .58;
     }
 
     .actions {
@@ -184,6 +194,12 @@
 
     th {
       background: #eef2f8;
+    }
+
+    .report-map-link {
+      color: inherit;
+      text-decoration-thickness: 2px;
+      text-underline-offset: 3px;
     }
 
     [hidden] {
@@ -237,6 +253,29 @@
             Добавить контрольную точку
           </button>
         </details>
+
+        <details class="hidden-checkpoints">
+          <summary>
+            <span class="label-text">
+              Скрытые контрольные точки
+              <span
+                class="info-icon"
+                role="img"
+                tabindex="0"
+                aria-label="Скрытые точки не показываются участникам маршрута. Они помогают проверить, срезал ли райдер маршрут."
+              >
+                ⓘ
+                <span class="tooltip" aria-hidden="true">
+                  Скрытые точки не показываются участникам маршрута. Они помогают проверить, срезал ли райдер маршрут.
+                </span>
+              </span>
+            </span>
+          </summary>
+          <div id="hidden-checkpoint-rows"></div>
+          <button id="add-hidden-checkpoint" class="secondary" type="button">
+            Добавить скрытую точку
+          </button>
+        </details>
       </section>
 
       <section>
@@ -267,6 +306,7 @@
   <script>
     const defaults = {{ defaults | tojson }};
     const rowsContainer = document.querySelector("#checkpoint-rows");
+    const hiddenRowsContainer = document.querySelector("#hidden-checkpoint-rows");
     const form = document.querySelector("#report-form");
     const errorBox = document.querySelector("#error");
     const reportSection = document.querySelector("#report-section");
@@ -279,9 +319,11 @@
       Intl.DateTimeFormat().resolvedOptions().timeZone;
     document.querySelector("#radius").value = defaults.radius_m;
 
-    function addCheckpoint(checkpoint = {}) {
+    function addCheckpoint(container, checkpoint = {}, hidden = false) {
       const row = document.createElement("div");
       row.className = "checkpoint-row";
+      row.dataset.hidden = hidden ? "true" : "false";
+      row.dataset.color = checkpoint.color ?? "";
       row.innerHTML = `
         <label>
           Название
@@ -300,21 +342,30 @@
         <button class="danger delete-checkpoint" type="button">Удалить</button>
       `;
       row.querySelector(".checkpoint-name").value = checkpoint.name ?? "";
-      row.querySelector(".checkpoint-latitude").value =
-        checkpoint.latitude ?? "";
-      row.querySelector(".checkpoint-longitude").value =
-        checkpoint.longitude ?? "";
+      const latitudeInput = row.querySelector(".checkpoint-latitude");
+      const longitudeInput = row.querySelector(".checkpoint-longitude");
+      latitudeInput.value = checkpoint.latitude ?? "";
+      longitudeInput.value = checkpoint.longitude ?? "";
       row.querySelector(".delete-checkpoint").addEventListener(
         "click",
         () => row.remove(),
       );
-      rowsContainer.append(row);
+      container.append(row);
     }
 
-    defaults.checkpoints.forEach(addCheckpoint);
+    defaults.checkpoints
+      .filter((checkpoint) => !checkpoint.hidden)
+      .forEach((checkpoint) => addCheckpoint(rowsContainer, checkpoint, false));
+    defaults.checkpoints
+      .filter((checkpoint) => checkpoint.hidden)
+      .forEach((checkpoint) => addCheckpoint(hiddenRowsContainer, checkpoint, true));
     document.querySelector("#add-checkpoint").addEventListener(
       "click",
-      () => addCheckpoint(),
+      () => addCheckpoint(rowsContainer, {}, false),
+    );
+    document.querySelector("#add-hidden-checkpoint").addEventListener(
+      "click",
+      () => addCheckpoint(hiddenRowsContainer, {}, true),
     );
 
     function currentConfiguration() {
@@ -326,26 +377,108 @@
             name: row.querySelector(".checkpoint-name").value,
             latitude: Number(row.querySelector(".checkpoint-latitude").value),
             longitude: Number(row.querySelector(".checkpoint-longitude").value),
+            hidden: row.dataset.hidden === "true",
           }),
         ),
       };
     }
 
-    function renderReport(data) {
+    function currentColumnColors() {
+      return [
+        "",
+        ...[...document.querySelectorAll(".checkpoint-row")].map(
+          (row) => row.dataset.color,
+        ),
+      ];
+    }
+
+    function currentColumnHiddenFlags() {
+      return [
+        false,
+        ...[...document.querySelectorAll(".checkpoint-row")].map(
+          (row) => row.dataset.hidden === "true",
+        ),
+      ];
+    }
+
+    function googleMapsLink(latitude, longitude) {
+      if (!latitude || !longitude) {
+        return "";
+      }
+      return `https://www.google.com/maps?q=${encodeURIComponent(
+        `${latitude},${longitude}`,
+      )}`;
+    }
+
+    function currentColumnMapLinks() {
+      return [
+        "",
+        ...[...document.querySelectorAll(".checkpoint-row")].map((row) =>
+          googleMapsLink(
+            row.querySelector(".checkpoint-latitude").value.trim(),
+            row.querySelector(".checkpoint-longitude").value.trim(),
+          ),
+        ),
+      ];
+    }
+
+    function applyReportNameColor(element, color) {
+      if (!color) {
+        return;
+      }
+      element.style.color = color;
+    }
+
+    function applyReportHiddenStyle(element, hidden) {
+      if (!hidden) {
+        return;
+      }
+      element.style.opacity = ".58";
+    }
+
+    function appendReportLink(cell, text, href, color) {
+      if (!href) {
+        cell.textContent = text;
+        applyReportNameColor(cell, color);
+        return;
+      }
+      const link = document.createElement("a");
+      link.className = "report-map-link";
+      link.href = href;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = text;
+      applyReportNameColor(link, color);
+      cell.append(link);
+    }
+
+    function renderReport(
+      data,
+      columnColors = [],
+      columnMapLinks = [],
+      columnHiddenFlags = [],
+    ) {
       reportTable.replaceChildren();
       const header = reportTable.createTHead().insertRow();
-      data.columns.forEach((column) => {
+      data.columns.forEach((column, index) => {
         const cell = document.createElement("th");
         cell.scope = "col";
-        cell.textContent = column;
+        appendReportLink(
+          cell,
+          column,
+          columnMapLinks[index],
+          columnColors[index],
+        );
+        applyReportHiddenStyle(cell, columnHiddenFlags[index]);
         header.append(cell);
       });
       const body = reportTable.createTBody();
       data.rows.forEach((values) => {
         const row = body.insertRow();
-        values.forEach((value) => {
+        values.forEach((value, index) => {
           const cell = row.insertCell();
           cell.textContent = value;
+          applyReportHiddenStyle(cell, columnHiddenFlags[index]);
         });
       });
 
@@ -368,13 +501,16 @@
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       errorBox.hidden = true;
-      if (!rowsContainer.children.length) {
-        errorBox.textContent = "Add at least one checkpoint.";
+      if (!document.querySelectorAll(".checkpoint-row").length) {
+        errorBox.textContent = "Добавьте хотя бы одну контрольную точку.";
         errorBox.hidden = false;
         return;
       }
 
       const body = new FormData();
+      const columnColors = currentColumnColors();
+      const columnHiddenFlags = currentColumnHiddenFlags();
+      const columnMapLinks = currentColumnMapLinks();
       body.append("configuration", JSON.stringify(currentConfiguration()));
       [...document.querySelector("#gpx-files").files].forEach(
         (file) => body.append("gpx_files", file),
@@ -388,7 +524,7 @@
           throw new Error(data.error || "Unable to generate report.");
         }
         reportData = data;
-        renderReport(data);
+        renderReport(data, columnColors, columnMapLinks, columnHiddenFlags);
       } catch (error) {
         errorBox.textContent = error.message;
         errorBox.hidden = false;

@@ -21,6 +21,8 @@ class Checkpoint:
     name: str
     latitude: float
     longitude: float
+    hidden: bool = False
+    color: str = ""
 
 
 @dataclass(frozen=True)
@@ -87,7 +89,13 @@ def parse_config(data: Any, source: str = "configuration") -> Config:
             raise ValueError(
                 f"{source}: checkpoint {name} coordinates are out of range"
             )
-        checkpoints.append(Checkpoint(name, latitude, longitude))
+        hidden = raw_checkpoint.get("hidden", False)
+        if not isinstance(hidden, bool):
+            raise ValueError(f"{source}: checkpoint {name} hidden must be a boolean")
+        color = raw_checkpoint.get("color", "")
+        if not isinstance(color, str):
+            raise ValueError(f"{source}: checkpoint {name} color must be a string")
+        checkpoints.append(Checkpoint(name, latitude, longitude, hidden, color))
         names.add(name)
 
     return Config(timezone, radius_m, tuple(checkpoints))

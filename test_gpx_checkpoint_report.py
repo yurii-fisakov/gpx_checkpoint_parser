@@ -45,7 +45,14 @@ class GpxCheckpointTests(unittest.TestCase):
                 "timezone": "Europe/Chisinau",
                 "radius_m": 25,
                 "checkpoints": [
-                    {"name": "start", "latitude": 47.0, "longitude": 28.0}
+                    {"name": "start", "latitude": 47.0, "longitude": 28.0},
+                    {
+                        "name": "secret",
+                        "latitude": 47.1,
+                        "longitude": 28.1,
+                        "hidden": True,
+                        "color": "#999999",
+                    },
                 ],
             }
         )
@@ -54,7 +61,10 @@ class GpxCheckpointTests(unittest.TestCase):
         self.assertEqual(config.radius_m, 25.0)
         self.assertEqual(
             config.checkpoints,
-            (Checkpoint("start", 47.0, 28.0),),
+            (
+                Checkpoint("start", 47.0, 28.0, False),
+                Checkpoint("secret", 47.1, 28.1, True, "#999999"),
+            ),
         )
 
     def test_builds_rows_from_explicit_paths_and_configuration(self) -> None:
