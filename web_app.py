@@ -35,6 +35,8 @@ def create_app(config_path: Optional[Path] = None) -> Flask:
                     "name": checkpoint.name,
                     "latitude": checkpoint.latitude,
                     "longitude": checkpoint.longitude,
+                    "hidden": checkpoint.hidden,
+                    "color": checkpoint.color,
                 }
                 for checkpoint in config.checkpoints
             ],

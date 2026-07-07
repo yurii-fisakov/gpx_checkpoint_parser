@@ -5,7 +5,8 @@
     {
       "name": "Старт, Giant Центр",
       "latitude": 47.03057231155459,
-      "longitude": 28.823230964436682
+      "longitude": 28.823230964436682,
+      "color": "green"
     },
     {
       "name": "Bomba, Калараш",
@@ -30,9 +31,62 @@
     {
       "name": "Финиш, Giant Рышкановка",
       "latitude": 47.04927991451699,
-      "longitude": 28.862793217677353
+      "longitude": 28.862793217677353,
+      "color": "red"
+    },
+    {
+      "name": "Скрытая точка 1",
+      "latitude": 47.364912,
+      "longitude": 27.959355,
+      "hidden": true
+    },
+    {
+      "name": "Скрытая точка 2",
+      "latitude": 47.328950,
+      "longitude": 27.883437,
+      "hidden": true
+    },
+    {
+      "name": "Скрытая точка 3",
+      "latitude": 47.525651,
+      "longitude": 27.770952,
+      "hidden": true
+    },
+    {
+      "name": "Скрытая точка 4",
+      "latitude": 47.529610,
+      "longitude": 27.869480,
+      "hidden": true
+    },
+    {
+      "name": "Скрытая точка 5",
+      "latitude": 47.485621,
+      "longitude": 28.127831,
+      "hidden": true
+    },
+    {
+      "name": "Скрытая точка 6",
+      "latitude": 47.369524,
+      "longitude": 28.635566,
+      "hidden": true
+    },
+    {
+      "name": "Скрытая точка 7",
+      "latitude": 47.332244,
+      "longitude": 28.807756,
+      "hidden": true
+    },
+    {
+      "name": "Скрытая точка 8",
+      "latitude": 47.260981,
+      "longitude": 29.130086,
+      "hidden": true
+    },
+    {
+      "name": "Скрытая точка 9",
+      "latitude": 47.135922,
+      "longitude": 28.938548,
+      "hidden": true
     }
   ]
 }
-
-

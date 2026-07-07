@@ -26,7 +26,14 @@ class WebAppTests(unittest.TestCase):
                     "timezone": "UTC",
                     "radius_m": 20,
                     "checkpoints": [
-                        {"name": "default", "latitude": 47.0, "longitude": 28.0}
+                        {"name": "default", "latitude": 47.0, "longitude": 28.0},
+                        {
+                            "name": "hidden default",
+                            "latitude": 47.1,
+                            "longitude": 28.1,
+                            "hidden": True,
+                            "color": "#999999",
+                        },
                     ],
                 }
             ),
@@ -43,35 +50,58 @@ class WebAppTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'"name": "default"', response.data)
+        self.assertIn(b'"name": "hidden default"', response.data)
+        self.assertIn(b'"hidden": true', response.data)
+        self.assertIn(b'"color": "#999999"', response.data)
         self.assertIn(b'"radius_m": 20.0', response.data)
+        self.assertIn("row.dataset.color = checkpoint.color", response.text)
+        self.assertIn("applyReportNameColor", response.text)
+        self.assertIn("currentColumnHiddenFlags", response.text)
+        self.assertIn("applyReportHiddenStyle", response.text)
+        self.assertIn("currentColumnMapLinks", response.text)
+        self.assertIn("appendReportLink", response.text)
+        self.assertIn("google.com/maps", response.text)
+        self.assertNotIn("style.borderLeftColor", response.text)
+        self.assertNotIn("row.style.borderLeftColor = checkpoint.color", response.text)
         for expected_control in (
             b'id="timezone"',
             b'id="radius"',
             b'id="checkpoint-rows"',
+            b'id="hidden-checkpoint-rows"',
             b'id="add-checkpoint"',
+            b'id="add-hidden-checkpoint"',
             b'id="gpx-files"',
             b'id="generate-report"',
             b'id="download-csv"',
         ):
             self.assertIn(expected_control, response.data)
+        self.assertNotIn(b'class="checkpoint-color"', response.data)
+        self.assertNotIn(b'class="checkpoint-map-link"', response.data)
         for expected_text in (
             "Отчёт по контрольным точкам GPX",
             "Настройки",
             "Часовой пояс браузера",
             "Контрольные точки",
             "Добавить контрольную точку",
+            "Скрытые контрольные точки",
+            "Добавить скрытую точку",
             "Файлы GPX",
             "Сформировать отчёт",
             "Скачать CSV",
         ):
             self.assertIn(expected_text, response.text)
+        self.assertNotIn("Цвет", response.text)
         self.assertIn('<html lang="ru">', response.text)
-        self.assertIn("<details>", response.text)
+        self.assertGreaterEqual(response.text.count("<details"), 2)
         self.assertNotIn("<details open", response.text)
         self.assertIn('class="info-icon"', response.text)
         self.assertIn('tabindex="0"', response.text)
         self.assertIn(
             "Расстояние, в пределах которого точка считается пройденной.",
+            response.text,
+        )
+        self.assertIn(
+            "Скрытые точки не показываются участникам маршрута",
             response.text,
         )
 
