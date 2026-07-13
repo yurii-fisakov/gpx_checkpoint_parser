@@ -11,7 +11,13 @@ from typing import Optional
 
 from flask import Flask, jsonify, render_template, request
 
-from gpx_checkpoint_report import build_report_rows, load_config, parse_config
+from gpx_checkpoint_report import (
+    ROUTE_TYPES,
+    build_report_rows,
+    config_name_for_route,
+    load_config,
+    parse_config,
+)
 
 
 ROOT = Path(__file__).resolve().parent
@@ -19,16 +25,20 @@ ROOT = Path(__file__).resolve().parent
 
 def create_app(config_path: Optional[Path] = None) -> Flask:
     app = Flask(__name__)
-    checkpoints_path = config_path or ROOT / "checkpoints.json"
 
-    @app.errorhandler(ValueError)
-    def handle_value_error(error: ValueError):
-        return jsonify(error=str(error)), 400
+    def route_config_path(route: str) -> Path:
+        if route not in ROUTE_TYPES:
+            raise ValueError("route must be 300 or 200")
+        if config_path is not None:
+            if route == "300":
+                return config_path
+            return config_path.with_name(config_name_for_route(route))
+        return ROOT / config_name_for_route(route)
 
-    @app.get("/")
-    def index():
-        config = load_config(checkpoints_path)
-        defaults = {
+    def configuration_defaults(route: str) -> dict:
+        config = load_config(route_config_path(route))
+        return {
+            "route": route,
             "radius_m": config.radius_m,
             "checkpoints": [
                 {
@@ -41,7 +51,21 @@ def create_app(config_path: Optional[Path] = None) -> Flask:
                 for checkpoint in config.checkpoints
             ],
         }
-        return render_template("index.html", defaults=defaults)
+
+    @app.errorhandler(ValueError)
+    def handle_value_error(error: ValueError):
+        return jsonify(error=str(error)), 400
+
+    @app.get("/")
+    def index():
+        return render_template(
+            "index.html",
+            defaults=configuration_defaults("300"),
+        )
+
+    @app.get("/api/config/<route>")
+    def configuration(route: str):
+        return jsonify(configuration_defaults(route))
 
     @app.post("/api/report")
     def report():

@@ -39,6 +39,18 @@ class WebAppTests(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        (self.config_path.parent / "checkpoints_200.json").write_text(
+            json.dumps(
+                {
+                    "timezone": "UTC",
+                    "radius_m": 25,
+                    "checkpoints": [
+                        {"name": "orhei 200", "latitude": 48.0, "longitude": 29.0}
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
         self.app = create_app(self.config_path)
         self.client = self.app.test_client()
 
@@ -104,6 +116,22 @@ class WebAppTests(unittest.TestCase):
             "Скрытые точки не показываются участникам маршрута",
             response.text,
         )
+
+    def test_route_configuration_endpoint_loads_selected_route(self) -> None:
+        response = self.client.get("/api/config/200")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["route"], "200")
+        self.assertEqual(response.get_json()["radius_m"], 25.0)
+        self.assertEqual(response.get_json()["checkpoints"][0]["name"], "orhei 200")
+
+    def test_route_configuration_endpoint_reports_missing_file(self) -> None:
+        (self.config_path.parent / "checkpoints_200.json").unlink()
+
+        response = self.client.get("/api/config/200")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("checkpoints_200.json", response.get_json()["error"])
 
     def test_generates_report_for_uploaded_files_and_browser_timezone(self) -> None:
         configuration = {
