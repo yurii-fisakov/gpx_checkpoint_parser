@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import argparse
 import json
 import math
 import sys
@@ -10,10 +11,17 @@ import xml.etree.ElementTree as ElementTree
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional, Sequence
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 EARTH_RADIUS_M = 6_371_000.0
+ROUTE_TYPES = ("300", "200")
+
+
+def config_name_for_route(route: str) -> str:
+    if route not in ROUTE_TYPES:
+        raise ValueError(f"unsupported route {route!r}; expected 300 or 200")
+    return f"checkpoints_{route}.json"
 
 
 @dataclass(frozen=True)
@@ -240,10 +248,10 @@ def build_report_rows(
 
 def generate_report(
     directory: Path,
-    config_name: str = "checkpoints.json",
+    route: str = "300",
     output_name: str = "report.csv",
 ) -> Path:
-    config = load_config(directory / config_name)
+    config = load_config(directory / config_name_for_route(route))
     output_path = directory / output_name
     rows = build_report_rows(list(directory.glob("*.gpx")), config)
 
@@ -256,9 +264,12 @@ def generate_report(
     return output_path
 
 
-def main() -> int:
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("route", choices=ROUTE_TYPES)
+    arguments = parser.parse_args(argv)
     try:
-        generate_report(Path.cwd())
+        generate_report(Path.cwd(), arguments.route)
     except ValueError as error:
         print(f"error: {error}", file=sys.stderr)
         return 1

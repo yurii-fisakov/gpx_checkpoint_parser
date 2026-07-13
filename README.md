@@ -13,7 +13,8 @@ application uses Flask.
 
 ## Configure
 
-Edit `checkpoints.json`:
+Edit `checkpoints_300.json` for Orhei 300. Add `checkpoints_200.json` with the
+same structure when the Orhei 200 checkpoint coordinates are available:
 
 ```json
 {
@@ -34,12 +35,16 @@ Checkpoint names become CSV columns in the same order. Use an
 
 ## Run
 
-Put `checkpoints.json`, the script, and one or more `*.gpx` files in the same
-directory, then run:
+Put the route checkpoint file, the script, and one or more `*.gpx` files in the
+same directory, then provide the route type:
 
 ```bash
-python3 gpx_checkpoint_report.py
+python3 gpx_checkpoint_report.py 300
+python3 gpx_checkpoint_report.py 200
 ```
+
+The `300` command loads `checkpoints_300.json`; the `200` command loads
+`checkpoints_200.json`.
 
 The script creates `report.csv`:
 
@@ -62,8 +67,10 @@ docker compose up --build
 ```
 
 Open [http://127.0.0.1:5000](http://127.0.0.1:5000). Compose mounts the local
-`checkpoints.json` read-only, so changes to the default checkpoints do not
-require rebuilding the image. Stop the service with `docker compose down`.
+`checkpoints_300.json` read-only, so changes to the Orhei 300 defaults do not
+require rebuilding the image. Add a second read-only mount for
+`checkpoints_200.json` after adding that file if the Orhei 200 route should be
+available in the container. Stop the service with `docker compose down`.
 
 To run without Compose:
 
@@ -73,8 +80,14 @@ docker run --rm \
   -p 127.0.0.1:5000:8000 \
   --read-only \
   --tmpfs /tmp \
-  -v "$PWD/checkpoints.json:/app/checkpoints.json:ro" \
+  -v "$PWD/checkpoints_300.json:/app/checkpoints_300.json:ro" \
   gpx-checkpoint-report
+```
+
+Add this volume to the command after creating the Orhei 200 file:
+
+```bash
+-v "$PWD/checkpoints_200.json:/app/checkpoints_200.json:ro" \
 ```
 
 The container stores uploaded GPX files only in temporary memory and does not
@@ -94,7 +107,9 @@ Start the local server:
 python3 web_app.py
 ```
 
-Open [http://127.0.0.1:5000](http://127.0.0.1:5000). The page loads the
-checkpoint defaults from `checkpoints.json` and uses your browser timezone.
-Edit, add, or delete checkpoints; select one or more GPX files; then generate
-the report. The displayed report can be downloaded as `report.csv`.
+Open [http://127.0.0.1:5000](http://127.0.0.1:5000). The page starts with
+`checkpoints_300.json`, lets you select Orhei 300 or Orhei 200, and uses your
+browser timezone. Edit, add, or delete checkpoints; select one or more GPX
+files; then generate the report. Selecting Orhei 200 before
+`checkpoints_200.json` exists shows a configuration error. The displayed report
+can be downloaded as `report.csv`.

@@ -39,6 +39,18 @@ class WebAppTests(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        (self.config_path.parent / "checkpoints_200.json").write_text(
+            json.dumps(
+                {
+                    "timezone": "UTC",
+                    "radius_m": 25,
+                    "checkpoints": [
+                        {"name": "orhei 200", "latitude": 48.0, "longitude": 29.0}
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
         self.app = create_app(self.config_path)
         self.client = self.app.test_client()
 
@@ -64,6 +76,9 @@ class WebAppTests(unittest.TestCase):
         self.assertNotIn("style.borderLeftColor", response.text)
         self.assertNotIn("row.style.borderLeftColor = checkpoint.color", response.text)
         for expected_control in (
+            b'id="route"',
+            b'<option value="300">Orhei 300</option>',
+            b'<option value="200">Orhei 200</option>',
             b'id="timezone"',
             b'id="radius"',
             b'id="checkpoint-rows"',
@@ -75,6 +90,7 @@ class WebAppTests(unittest.TestCase):
             b'id="download-csv"',
         ):
             self.assertIn(expected_control, response.data)
+        self.assertIn("/api/config/", response.text)
         self.assertNotIn(b'class="checkpoint-color"', response.data)
         self.assertNotIn(b'class="checkpoint-map-link"', response.data)
         for expected_text in (
@@ -104,6 +120,22 @@ class WebAppTests(unittest.TestCase):
             "Скрытые точки не показываются участникам маршрута",
             response.text,
         )
+
+    def test_route_configuration_endpoint_loads_selected_route(self) -> None:
+        response = self.client.get("/api/config/200")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["route"], "200")
+        self.assertEqual(response.get_json()["radius_m"], 25.0)
+        self.assertEqual(response.get_json()["checkpoints"][0]["name"], "orhei 200")
+
+    def test_route_configuration_endpoint_reports_missing_file(self) -> None:
+        (self.config_path.parent / "checkpoints_200.json").unlink()
+
+        response = self.client.get("/api/config/200")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("checkpoints_200.json", response.get_json()["error"])
 
     def test_generates_report_for_uploaded_files_and_browser_timezone(self) -> None:
         configuration = {
@@ -342,6 +374,10 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("python3 -m pip install -r requirements.txt", readme)
         self.assertIn("python3 web_app.py", readme)
         self.assertIn("http://127.0.0.1:5000", readme)
+        self.assertIn("python3 gpx_checkpoint_report.py 300", readme)
+        self.assertIn("python3 gpx_checkpoint_report.py 200", readme)
+        self.assertIn("checkpoints_300.json", readme)
+        self.assertIn("checkpoints_200.json", readme)
 
     @staticmethod
     def _configuration() -> dict:
