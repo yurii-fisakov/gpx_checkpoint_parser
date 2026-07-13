@@ -81,6 +81,7 @@
     }
 
     input,
+    select,
     button {
       font: inherit;
     }
@@ -224,6 +225,13 @@
         <h2>Настройки</h2>
         <div class="settings">
           <label>
+            Маршрут
+            <select id="route">
+              <option value="300">Orhei 300</option>
+              <option value="200">Orhei 200</option>
+            </select>
+          </label>
+          <label>
             Часовой пояс браузера
             <input id="timezone" readonly required>
           </label>
@@ -313,8 +321,11 @@
     const reportTable = document.querySelector("#report-table");
     const warningsBox = document.querySelector("#warnings");
     const submitButton = document.querySelector("#generate-report");
+    const routeSelect = document.querySelector("#route");
     let reportData = null;
+    let lastLoadedRoute = defaults.route;
 
+    routeSelect.value = defaults.route;
     document.querySelector("#timezone").value =
       Intl.DateTimeFormat().resolvedOptions().timeZone;
     document.querySelector("#radius").value = defaults.radius_m;
@@ -353,12 +364,40 @@
       container.append(row);
     }
 
-    defaults.checkpoints
-      .filter((checkpoint) => !checkpoint.hidden)
-      .forEach((checkpoint) => addCheckpoint(rowsContainer, checkpoint, false));
-    defaults.checkpoints
-      .filter((checkpoint) => checkpoint.hidden)
-      .forEach((checkpoint) => addCheckpoint(hiddenRowsContainer, checkpoint, true));
+    function applyConfiguration(configuration) {
+      document.querySelector("#radius").value = configuration.radius_m;
+      rowsContainer.replaceChildren();
+      hiddenRowsContainer.replaceChildren();
+      configuration.checkpoints
+        .filter((checkpoint) => !checkpoint.hidden)
+        .forEach((checkpoint) => addCheckpoint(rowsContainer, checkpoint, false));
+      configuration.checkpoints
+        .filter((checkpoint) => checkpoint.hidden)
+        .forEach((checkpoint) => addCheckpoint(hiddenRowsContainer, checkpoint, true));
+    }
+
+    applyConfiguration(defaults);
+
+    routeSelect.addEventListener("change", async () => {
+      const selectedRoute = routeSelect.value;
+      errorBox.hidden = true;
+      try {
+        const response = await fetch(`/api/config/${selectedRoute}`);
+        const configuration = await response.json();
+        if (!response.ok) {
+          throw new Error(configuration.error || "Не удалось загрузить маршрут.");
+        }
+        applyConfiguration(configuration);
+        lastLoadedRoute = selectedRoute;
+        reportData = null;
+        reportSection.hidden = true;
+      } catch (error) {
+        routeSelect.value = lastLoadedRoute;
+        errorBox.textContent = error.message;
+        errorBox.hidden = false;
+      }
+    });
+
     document.querySelector("#add-checkpoint").addEventListener(
       "click",
       () => addCheckpoint(rowsContainer, {}, false),

@@ -76,6 +76,9 @@ class WebAppTests(unittest.TestCase):
         self.assertNotIn("style.borderLeftColor", response.text)
         self.assertNotIn("row.style.borderLeftColor = checkpoint.color", response.text)
         for expected_control in (
+            b'id="route"',
+            b'<option value="300">Orhei 300</option>',
+            b'<option value="200">Orhei 200</option>',
             b'id="timezone"',
             b'id="radius"',
             b'id="checkpoint-rows"',
@@ -87,6 +90,7 @@ class WebAppTests(unittest.TestCase):
             b'id="download-csv"',
         ):
             self.assertIn(expected_control, response.data)
+        self.assertIn("/api/config/", response.text)
         self.assertNotIn(b'class="checkpoint-color"', response.data)
         self.assertNotIn(b'class="checkpoint-map-link"', response.data)
         for expected_text in (
