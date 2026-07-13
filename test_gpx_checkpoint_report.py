@@ -16,6 +16,7 @@ from gpx_checkpoint_report import (
     generate_report,
     haversine_m,
     load_config,
+    main,
     parse_config,
 )
 
@@ -39,6 +40,48 @@ def write_gpx(
 
 
 class GpxCheckpointTests(unittest.TestCase):
+    def test_generates_report_from_selected_route_configuration(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            runtime_directory = Path(directory)
+            (runtime_directory / "checkpoints_200.json").write_text(
+                json.dumps(
+                    {
+                        "timezone": "UTC",
+                        "radius_m": 20,
+                        "checkpoints": [
+                            {
+                                "name": "orhei_200",
+                                "latitude": 47.0,
+                                "longitude": 28.0,
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            write_gpx(
+                runtime_directory / "rider.gpx",
+                [(47.0, 28.0, "2026-07-01T01:00:00Z")],
+            )
+
+            report_path = generate_report(runtime_directory, "200")
+
+            with report_path.open(newline="", encoding="utf-8") as report:
+                self.assertEqual(
+                    list(csv.reader(report)),
+                    [["user_name", "orhei_200"], ["rider", "01:00:00"]],
+                )
+
+    def test_rejects_unsupported_route(self) -> None:
+        with self.assertRaisesRegex(ValueError, "route"):
+            generate_report(Path("."), "100")
+
+    def test_cli_requires_a_supported_route(self) -> None:
+        with self.assertRaises(SystemExit):
+            main([])
+        with self.assertRaises(SystemExit):
+            main(["100"])
+
     def test_parses_in_memory_configuration(self) -> None:
         config = parse_config(
             {
@@ -197,7 +240,7 @@ class GpxCheckpointTests(unittest.TestCase):
     def test_report_continues_after_missing_timestamp(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             runtime_directory = Path(directory)
-            (runtime_directory / "checkpoints.json").write_text(
+            (runtime_directory / "checkpoints_300.json").write_text(
                 json.dumps(
                     {
                         "timezone": "UTC",
@@ -242,7 +285,7 @@ class GpxCheckpointTests(unittest.TestCase):
     def test_generates_dynamic_columns_sorted_by_gpx_filename(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             runtime_directory = Path(directory)
-            (runtime_directory / "checkpoints.json").write_text(
+            (runtime_directory / "checkpoints_300.json").write_text(
                 json.dumps(
                     {
                         "timezone": "Europe/Chisinau",
@@ -288,7 +331,7 @@ class GpxCheckpointTests(unittest.TestCase):
 
     def test_rejects_duplicate_checkpoint_names(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            config_path = Path(directory) / "checkpoints.json"
+            config_path = Path(directory) / "checkpoints_300.json"
             config_path.write_text(
                 json.dumps(
                     {
