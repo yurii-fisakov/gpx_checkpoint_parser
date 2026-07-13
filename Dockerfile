@@ -11,7 +11,7 @@ RUN python -m pip install \
     --disable-pip-version-check \
     -r requirements.txt
 
-COPY --chown=10001:10001 gpx_checkpoint_report.py web_app.py checkpoints.json ./
+COPY --chown=10001:10001 gpx_checkpoint_report.py web_app.py checkpoints_300.json ./
 COPY --chown=10001:10001 templates ./templates
 
 USER 10001:10001

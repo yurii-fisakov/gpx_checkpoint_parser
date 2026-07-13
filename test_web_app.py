@@ -374,6 +374,10 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("python3 -m pip install -r requirements.txt", readme)
         self.assertIn("python3 web_app.py", readme)
         self.assertIn("http://127.0.0.1:5000", readme)
+        self.assertIn("python3 gpx_checkpoint_report.py 300", readme)
+        self.assertIn("python3 gpx_checkpoint_report.py 200", readme)
+        self.assertIn("checkpoints_300.json", readme)
+        self.assertIn("checkpoints_200.json", readme)
 
     @staticmethod
     def _configuration() -> dict:

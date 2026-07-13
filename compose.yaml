@@ -6,8 +6,8 @@ services:
       - "127.0.0.1:5000:8000"
     volumes:
       - type: bind
-        source: ./checkpoints.json
-        target: /app/checkpoints.json
+        source: ./checkpoints_300.json
+        target: /app/checkpoints_300.json
         read_only: true
     read_only: true
     tmpfs:
